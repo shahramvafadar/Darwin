@@ -1,0 +1,55 @@
+﻿@model IReadOnlyList<Darwin.Application.Catalog.DTOs.ProductListItemDto>
+@{
+    ViewData["Title"] = "Products";
+    Layout = "~/Areas/Admin/Views/Shared/_Layout.cshtml";
+    var page = (int)(ViewBag.Page ?? 1);
+    var pageSize = (int)(ViewBag.PageSize ?? 20);
+    var total = (int)(ViewBag.Total ?? 0);
+    var pages = (int)Math.Ceiling(total / (double)pageSize);
+}
+
+<h2>Products</h2>
+
+<p>
+    <a asp-action="Create" class="btn btn-primary">Create New</a>
+</p>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Name (de-DE)</th>
+            <th>Variants</th>
+            <th>Active</th>
+            <th>Visible</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var p in Model)
+        {
+            <tr>
+                <td>@p.DefaultName</td>
+                <td>@p.VariantCount</td>
+                <td>@p.IsActive</td>
+                <td>@p.IsVisible</td>
+                <td>
+                    <a asp-action="Edit" asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@if (pages > 1)
+{
+    <nav>
+        <ul class="pagination">
+            @for (int i = 1; i <= pages; i++)
+            {
+                <li class="page-item @(i == page ? "active" : "")">
+                    <a class="page-link" asp-action="Index" asp-route-page="@i" asp-route-pageSize="@pageSize">@i</a>
+                </li>
+            }
+        </ul>
+    </nav>
+}

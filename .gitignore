@@ -3,6 +3,20 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+# build artifacts
+bin/
+obj/
+
+# Local & dev configs
+**/appsettings.Development.json
+**/appsettings.*.Development.json
+**/secrets.json
+**/local.settings.json   # (Azure Functions)
+
+# Logs
+*.log
+logs/
+
 # User-specific files
 *.rsuser
 *.suo
