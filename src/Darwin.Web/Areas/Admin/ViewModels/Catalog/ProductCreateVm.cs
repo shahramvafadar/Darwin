@@ -43,7 +43,15 @@ namespace Darwin.Web.Areas.Admin.ViewModels.Catalog
         public Guid? BrandId { get; set; }
         public Guid? PrimaryCategoryId { get; set; }
         public string Kind { get; set; } = "Simple";
-        public List<ProductTranslationVm> Translations { get; set; } = new();
-        public List<ProductVariantCreateVm> Variants { get; set; } = new();
+
+        // Ensure these collections are always non-null and have one default row for initial rendering.
+        public List<ProductTranslationVm> Translations { get; set; }
+        public List<ProductVariantCreateVm> Variants { get; set; }
+
+        public ProductCreateVm()
+        {
+            Translations = new List<ProductTranslationVm> { new() { Culture = "de-DE" } };
+            Variants = new List<ProductVariantCreateVm> { new() { Currency = "EUR" } };
+        }
     }
 }

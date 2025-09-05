@@ -1,5 +1,5 @@
 ﻿using Darwin.Application.Catalog.Commands;
-using Darwin.Application.Catalog.Commands.UpdateProduct;
+using Darwin.Application.Catalog.Queries;
 using Darwin.Application.Catalog.Queries.GetProductForEdit;
 using Darwin.Application.Catalog.Queries.GetProductsPage;
 using Darwin.Application.Extensions;
@@ -48,11 +48,20 @@ namespace Darwin.Web.Extensions
             // Register application handlers used by Web
             services.AddScoped<CreateProductHandler>();
 
-            // Register command/query handlers (no MediatR)
+            // Handlers — Products
             services.AddScoped<CreateProductHandler>();
             services.AddScoped<UpdateProductHandler>();
             services.AddScoped<GetProductsPageHandler>();
             services.AddScoped<GetProductForEditHandler>();
+
+            // Handlers — Categories
+            services.AddScoped<CreateCategoryHandler>();
+            services.AddScoped<UpdateCategoryHandler>();
+            services.AddScoped<GetCategoriesPageHandler>();
+            services.AddScoped<GetCategoryForEditHandler>();
+
+            // Lookups
+            services.AddScoped<GetCatalogLookupsHandler>();
 
             return services;
         }

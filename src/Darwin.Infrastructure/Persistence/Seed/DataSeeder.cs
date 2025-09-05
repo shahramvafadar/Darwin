@@ -1,19 +1,21 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
-using Darwin.Domain.Entities.Settings;
+using Darwin.Domain.Entities.Catalog;
 using Darwin.Domain.Entities.Pricing;
+using Darwin.Domain.Entities.Settings;
+using Darwin.Infrastructure.Persistence.Db;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System;
 
 namespace Darwin.Infrastructure.Persistence.Seed
 {
     public sealed class DataSeeder
     {
-        private readonly DbContext _db;
+        private readonly DarwinDbContext _db;
         private readonly ILogger<DataSeeder> _logger;
 
-        public DataSeeder(DbContext db, ILogger<DataSeeder> logger)
+        public DataSeeder(DarwinDbContext db, ILogger<DataSeeder> logger)
         {
             _db = db;
             _logger = logger;
@@ -23,7 +25,6 @@ namespace Darwin.Infrastructure.Persistence.Seed
         {
             _logger.LogInformation("Starting data seeding…");
 
-            // SiteSetting
             if (!await _db.Set<SiteSetting>().AnyAsync(ct))
             {
                 _db.Add(new SiteSetting
@@ -42,7 +43,6 @@ namespace Darwin.Infrastructure.Persistence.Seed
                 await _db.SaveChangesAsync(ct);
             }
 
-            // Tax categories (DE 19% & 7%)
             if (!await _db.Set<TaxCategory>().AnyAsync(ct))
             {
                 _db.Add(new TaxCategory { Name = "Standard", VatRate = 0.19m, EffectiveFromUtc = DateTime.UtcNow });
@@ -50,7 +50,24 @@ namespace Darwin.Infrastructure.Persistence.Seed
                 await _db.SaveChangesAsync(ct);
             }
 
-            // TODO: seed Menus, Pages (Home/Privacy/Impressum), sample Catalog categories/brands if needed
+            if (!await _db.Set<Brand>().AnyAsync(ct))
+            {
+                _db.Add(new Brand { Name = "Darwin Generic" });
+                await _db.SaveChangesAsync(ct);
+            }
+
+            if (!await _db.Set<Category>().AnyAsync(ct))
+            {
+                var root = new Category { IsActive = true, SortOrder = 1 };
+                root.Translations.Add(new CategoryTranslation { Culture = "de-DE", Name = "Lebensmittel", Slug = "lebensmittel" });
+
+                var fruits = new Category { ParentId = root.Id, IsActive = true, SortOrder = 2 };
+                fruits.Translations.Add(new CategoryTranslation { Culture = "de-DE", Name = "Obst", Slug = "obst" });
+
+                _db.Add(root);
+                _db.Add(fruits);
+                await _db.SaveChangesAsync(ct);
+            }
 
             _logger.LogInformation("Data seeding completed.");
         }

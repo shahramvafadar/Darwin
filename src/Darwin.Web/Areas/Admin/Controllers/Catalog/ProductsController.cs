@@ -1,5 +1,6 @@
 ﻿using Darwin.Application.Catalog.Commands;
 using Darwin.Application.Catalog.DTOs;
+using Darwin.Application.Catalog.Queries;
 using Darwin.Application.Catalog.Queries.GetProductForEdit;
 using Darwin.Application.Catalog.Queries.GetProductsPage;
 using Darwin.Web.Areas.Admin.ViewModels.Catalog;
@@ -19,17 +20,20 @@ namespace Darwin.Web.Areas.Admin.Controllers.Catalog
         private readonly UpdateProductHandler _updateProduct;
         private readonly GetProductsPageHandler _getProductsPage;
         private readonly GetProductForEditHandler _getProductForEdit;
+        private readonly GetCatalogLookupsHandler _getLookups;
 
         public ProductsController(
             CreateProductHandler createProduct,
             UpdateProductHandler updateProduct,
             GetProductsPageHandler getProductsPage,
-            GetProductForEditHandler getProductForEdit)
+            GetProductForEditHandler getProductForEdit,
+            GetCatalogLookupsHandler getLookups)
         {
             _createProduct = createProduct;
             _updateProduct = updateProduct;
             _getProductsPage = getProductsPage;
             _getProductForEdit = getProductForEdit;
+            _getLookups = getLookups;
         }
 
         [HttpGet]
@@ -43,13 +47,20 @@ namespace Darwin.Web.Areas.Admin.Controllers.Catalog
         }
 
         [HttpGet]
-        public IActionResult Create()
+        public async Task<IActionResult> Create(CancellationToken ct)
         {
-            var vm = new ProductCreateVm
-            {
-                Translations = { new ProductTranslationVm { Culture = "de-DE" } },
-                Variants = { new ProductVariantCreateVm() }
-            };
+            await LoadLookupsAsync(ct);
+
+            var vm = new ProductCreateVm();
+
+            // Ensure we always render at least one item in collections for binding.
+            EnsureAtLeastOneTranslation(vm);
+            EnsureAtLeastOneVariant(vm);
+
+            // Preselect defaults
+            vm.Translations[0].Culture = "de-DE";
+            vm.Variants[0].Currency = "EUR";
+
             return View(vm);
         }
 
@@ -57,8 +68,20 @@ namespace Darwin.Web.Areas.Admin.Controllers.Catalog
         [HttpPost]
         public async Task<IActionResult> Create(ProductCreateVm vm, CancellationToken ct)
         {
+            // Model binding might leave collections null/empty if the form didn’t render them for any reason.
+            if (vm.Translations == null || vm.Translations.Count == 0)
+                ModelState.AddModelError(nameof(vm.Translations), "At least one translation is required.");
+
+            if (vm.Variants == null || vm.Variants.Count == 0)
+                ModelState.AddModelError(nameof(vm.Variants), "At least one variant is required.");
+
             if (!ModelState.IsValid)
+            {
+                await LoadLookupsAsync(ct);
+                EnsureAtLeastOneTranslation(vm);
+                EnsureAtLeastOneVariant(vm);
                 return View(vm);
+            }
 
             var dto = new ProductCreateDto
             {
@@ -110,6 +133,11 @@ namespace Darwin.Web.Areas.Admin.Controllers.Catalog
             {
                 foreach (var e in ex.Errors)
                     ModelState.AddModelError(e.PropertyName, e.ErrorMessage);
+
+                await LoadLookupsAsync(ct);
+                // Rehydrate a minimal item if lists got emptied after mapping/errors
+                EnsureAtLeastOneTranslation(vm);
+                EnsureAtLeastOneVariant(vm);
                 return View(vm);
             }
         }
@@ -120,7 +148,6 @@ namespace Darwin.Web.Areas.Admin.Controllers.Catalog
             var dto = await _getProductForEdit.HandleAsync(id, ct);
             if (dto == null) return NotFound();
 
-            // Map DTO -> VM
             var vm = new ProductEditVm
             {
                 Id = dto.Id,
@@ -163,6 +190,7 @@ namespace Darwin.Web.Areas.Admin.Controllers.Catalog
                 }).ToList()
             };
 
+            await LoadLookupsAsync(ct);
             return View(vm);
         }
 
@@ -170,7 +198,11 @@ namespace Darwin.Web.Areas.Admin.Controllers.Catalog
         [HttpPost]
         public async Task<IActionResult> Edit(ProductEditVm vm, CancellationToken ct)
         {
-            if (!ModelState.IsValid) return View(vm);
+            if (!ModelState.IsValid)
+            {
+                await LoadLookupsAsync(ct);
+                return View(vm);
+            }
 
             var dto = new ProductEditDto
             {
@@ -223,14 +255,43 @@ namespace Darwin.Web.Areas.Admin.Controllers.Catalog
             catch (DbUpdateConcurrencyException)
             {
                 ModelState.AddModelError(string.Empty, "Concurrency conflict: the record was modified by another user. Please reload and try again.");
+                await LoadLookupsAsync(ct);
                 return View(vm);
             }
             catch (FluentValidation.ValidationException ex)
             {
                 foreach (var e in ex.Errors)
                     ModelState.AddModelError(e.PropertyName, e.ErrorMessage);
+
+                await LoadLookupsAsync(ct);
                 return View(vm);
             }
+        }
+
+        // Helpers to guarantee at least one item is present for model binding and UI rendering.
+        private static void EnsureAtLeastOneTranslation(ProductCreateVm vm)
+        {
+            if (vm.Translations == null) vm.Translations = new();
+            if (vm.Translations.Count == 0) vm.Translations.Add(new ProductTranslationVm());
+        }
+        private static void EnsureAtLeastOneVariant(ProductCreateVm vm)
+        {
+            if (vm.Variants == null) vm.Variants = new();
+            if (vm.Variants.Count == 0) vm.Variants.Add(new ProductVariantCreateVm());
+        }
+
+        private async Task LoadLookupsAsync(CancellationToken ct)
+        {
+            var lookups = await _getLookups.HandleAsync("de-DE", ct);
+            ViewBag.Brands = lookups.Brands;
+            ViewBag.Categories = lookups.Categories;
+            ViewBag.TaxCategories = lookups.TaxCategories;
+
+            // Supported cultures (later: read from SiteSetting/RequestLocalizationOptions).
+            ViewBag.Cultures = new[] { "de-DE", "en-US" };
+
+            // Allowed currencies (later: from SiteSetting).
+            ViewBag.Currencies = new[] { "EUR", "USD", "GBP" };
         }
     }
 }
